@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Who's Up? New Mexico Edition</title>
+    <style>
+        body {
+            background-color: #0b0b0b;
+            color: #e0e0e0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+            padding: 40px;
+            gap: 40px;
+        }
+        .sidebar { width: 300px; }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(25, 22px);
+            gap: 3px;
+            align-content: start;
+        }
+        .square { width: 22px; height: 22px; background-color: #333; border-radius: 2px; }
+        .work    { background-color: #ff4d4d; }
+        .travel  { background-color: #ffa500; }
+        .eating  { background-color: #4db84d; }
+        .leisure { background-color: #3399ff; }
+
+        h1 { font-size: 3rem; margin-bottom: 0; }
+        .count { font-size: 2.5rem; font-weight: bold; color: #fff; }
+        .subtitle { color: #aaa; font-size: 0.85rem; margin-top: 4px; }
+        #last-updated { color: #555; font-size: 0.75rem; margin-top: 6px; }
+
+        #legend p { margin: 6px 0; }
+        .dot { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+        #error-msg {
+            display: none;
+            background: #3a1010;
+            border: 1px solid #ff4d4d;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #ff9999;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1>Who Up?</h1>
+        <div class="count" id="awake-count">Loading...</div>
+        <p class="subtitle">New Mexicans awake right now</p>
+        <div id="last-updated">Last updated: —</div>
+        <div id="error-msg">⚠️ Could not load city_pulse.json.<br>Run <code>run_pulse.py</code> first, then serve this folder with:<br><code>python -m http.server 8000</code></div>
+        <hr style="border: 0.5px solid #222; margin: 16px 0;">
+        <div id="legend">
+            <p><span class="dot" style="background:#ff4d4d"></span>Work: <strong id="work-val">—</strong></p>
+            <p><span class="dot" style="background:#ffa500"></span>Travel: <strong id="travel-val">—</strong></p>
+            <p><span class="dot" style="background:#4db84d"></span>Eating: <strong id="eating-val">—</strong></p>
+            <p><span class="dot" style="background:#3399ff"></span>Leisure: <strong id="leisure-val">—</strong></p>
+        </div>
+        <p style="color:#444; font-size:0.7rem; margin-top: 20px;">1 square = 1,000 people</p>
+    </div>
+    <div class="grid-container" id="nm-grid"></div>
+
+    <script>
+        async function loadAndRender() {
+            let stats;
+
+            try {
+                // city_pulse.json must be served via a local server, not file://
+                const res = await fetch('city_pulse.json?t=' + Date.now());
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // Use grid block from generate_nm_grid.py if available, else fall back to raw estimates
+                if (data.grid) {
+                    stats = data.grid;
+                } else {
+                    // Fallback: rough calculation from raw numbers
+                    const travelers = Math.round((data.travelers_estimate || 0) / 1000);
+                    const commuters = Math.round((data.commute_estimate || 0) / 1000);
+                    stats = {
+                        work: 399,
+                        travel: travelers + commuters,
+                        eating: 33,
+                        leisure: 200,
+                        total: 665
+                    };
+                }
+
+                // Show last updated time
+                if (data.last_updated) {
+                    document.getElementById('last-updated').textContent = 'Last updated: ' + data.last_updated;
+                }
+
+            } catch (err) {
+                console.error('Failed to load city_pulse.json:', err);
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('awake-count').textContent = 'Error';
+                return;
+            }
+
+            // Update legend numbers
+            const fmt = (n) => (n * 1000).toLocaleString();
+            document.getElementById('work-val').textContent    = fmt(stats.work);
+            document.getElementById('travel-val').textContent  = fmt(stats.travel);
+            document.getElementById('eating-val').textContent  = fmt(stats.eating);
+            document.getElementById('leisure-val').textContent = fmt(stats.leisure);
+
+            const awake = stats.work + stats.travel + stats.eating + stats.leisure;
+            document.getElementById('awake-count').textContent = (awake * 1000).toLocaleString();
+
+            // Build the grid
+            const grid = document.getElementById('nm-grid');
+            grid.innerHTML = '';
+
+            const categories = [
+                { key: 'work',    cls: 'work'    },
+                { key: 'travel',  cls: 'travel'  },
+                { key: 'eating',  cls: 'eating'  },
+                { key: 'leisure', cls: 'leisure' },
+            ];
+
+            let filled = 0;
+            for (const cat of categories) {
+                const count = stats[cat.key] || 0;
+                for (let i = 0; i < count; i++) {
+                    const div = document.createElement('div');
+                    div.className = `square ${cat.cls}`;
+                    grid.appendChild(div);
+                    filled++;
+                }
+            }
+
+            // Fill remaining squares as dark (unaccounted)
+            const total = stats.total || 665;
+            for (let i = filled; i < total; i++) {
+                const div = document.createElement('div');
+                div.className = 'square';
+                grid.appendChild(div);
+            }
+        }
+
+        // Load on startup, then refresh every 5 minutes
+        loadAndRender();
+        setInterval(loadAndRender, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

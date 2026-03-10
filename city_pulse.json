@@ -1,0 +1,14 @@
+{
+    "active_stations": 27,
+    "commute_estimate": 1350,
+    "last_updated": "2026-03-09 19:56:56",
+    "grid": {
+        "work": 133,
+        "travel": 8,
+        "eating": 33,
+        "leisure": 365,
+        "total": 665
+    },
+    "active_flights": 45,
+    "travelers_estimate": 6750
+}
